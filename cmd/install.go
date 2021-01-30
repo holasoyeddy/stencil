@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"net/url"
 	"os"
+	"path"
 
 	"github.com/go-git/go-git/v5"
 	_ "github.com/go-git/go-git/v5"
@@ -14,11 +16,13 @@ var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Downloads and installs a Stencil template.",
 	Long:  `Downloads a Stencil template from a git repository and installs it in the $STENCIL/templates path.`,
+	Args:  cobra.ExactArgs(1),
 	RunE:  install,
 }
 
 func init() {
 	rootCmd.AddCommand(installCmd)
+	installCmd.Flags().StringP("name", "n", "", "Specifies the name of the new template.")
 
 	// Here you will define your flags and configuration settings.
 
@@ -33,14 +37,33 @@ func init() {
 
 func install(cmd *cobra.Command, args []string) error {
 
-	path, err := internal.GetStencilPath()
+	// get template name
+	name, err := cmd.Flags().GetString("name")
 
 	if err != nil {
 		return err
 	}
 
-	_, err = git.PlainClone(path+"/templates/go-git", false, &git.CloneOptions{
-		URL:      "https://github.com/go-git/go-git",
+	if name == "" {
+		url, err := url.Parse(args[0])
+
+		if err != nil {
+			return err
+		}
+
+		name = path.Base(url.Path)
+	}
+
+	// Get STENCIL path
+	stencilPath, err := internal.GetStencilPath()
+
+	if err != nil {
+		return err
+	}
+
+	// Git clone into $STENCIL/templates directory
+	_, err = git.PlainClone(stencilPath+"/templates/"+name, false, &git.CloneOptions{
+		URL:      args[0],
 		Progress: os.Stdout,
 	})
 
